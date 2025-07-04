@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "my_project"
+version = "0.1.0"
+description = "A simple Kedro-Aiflow-MLflow demo"
+authors = ["Your Name <you@example.com>"]
+packages = [{ include = "my_project" }]
+package_dir = { "" = "src" }
+
+[tool.kedro]
+package_name = "my_project"
+project_name = "My Project"
+kedro_init_version = "0.19.13"
+
+[build-system]
+requires = ["kedro>=0.19.13", "setuptools>=38.3.1", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.kedro_telemetry]
+project_id = "62327d88b29b4f5cad9ff30fad0f0f3d"

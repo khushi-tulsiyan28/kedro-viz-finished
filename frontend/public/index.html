@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kedro Pipeline Visualizer</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        .node {
+            transition: all 0.3s ease;
+        }
+        .node.completed {
+            @apply bg-green-500 text-white;
+        }
+        .node.running {
+            @apply bg-blue-500 text-white animate-pulse;
+        }
+        .node.error {
+            @apply bg-red-500 text-white;
+        }
+        .pipeline-line {
+            position: absolute;
+            height: 2px;
+            background-color: #9CA3AF;
+            transform-origin: left center;
+            z-index: -1;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <header class="mb-8">
+            <h1 class="text-3xl font-bold text-gray-800">Kedro Pipeline Visualizer</h1>
+            <p class="text-gray-600">Real-time pipeline execution monitoring</p>
+        </header>
+
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-semibold text-gray-800">Pipeline Controls</h2>
+                <button id="runPipeline" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg transition duration-200">
+                    Run Pipeline
+                </button>
+            </div>
+            
+            <div class="relative">
+                <!-- Pipeline Visualization -->
+                <div id="pipelineContainer" class="grid grid-cols-4 gap-8 py-8 px-4 relative">
+                    <!-- Nodes will be dynamically added here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Execution Log</h2>
+            <div id="logOutput" class="bg-gray-800 text-green-400 font-mono text-sm p-4 rounded-lg h-64 overflow-y-auto">
+                <div>Ready to run the pipeline...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const socket = io();
+            const logOutput = document.getElementById('logOutput');
+            const runButton = document.getElementById('runPipeline');
+            const pipelineContainer = document.getElementById('pipelineContainer');
+            
+            // Define pipeline nodes in order
+            const nodes = [
+                { id: 'node1', name: 'Node 1', description: 'Data Loading' },
+                { id: 'node2', name: 'Node 2', description: 'Data Processing' },
+                { id: 'node3', name: 'Node 3', description: 'Feature Engineering' },
+                { id: 'node4', name: 'Node 4', description: 'Final Processing' }
+            ];
+
+            // Create node elements
+            nodes.forEach((node, index) => {
+                const nodeElement = document.createElement('div');
+                nodeElement.id = `node-${node.id}`;
+                nodeElement.className = 'node bg-white border-2 border-gray-300 rounded-lg p-4 text-center shadow-sm transition-all duration-300';
+                nodeElement.innerHTML = `
+                    <div class="font-bold text-gray-700">${node.name}</div>
+                    <div class="text-sm text-gray-500 mt-1">${node.description}</div>
+                    <div class="mt-2 text-xs text-gray-400 node-status">Pending</div>
+                `;
+                pipelineContainer.appendChild(nodeElement);
+            });
+
+            // Draw connecting lines between nodes
+            function drawLines() {
+                // Remove existing lines
+                document.querySelectorAll('.pipeline-line').forEach(el => el.remove());
+                
+                // Draw new lines
+                for (let i = 0; i < nodes.length - 1; i++) {
+                    const startNode = document.getElementById(`node-${nodes[i].id}`);
+                    const endNode = document.getElementById(`node-${nodes[i + 1].id}`);
+                    
+                    if (startNode && endNode) {
+                        const startRect = startNode.getBoundingClientRect();
+                        const endRect = endNode.getBoundingClientRect();
+                        
+                        const line = document.createElement('div');
+                        line.className = 'pipeline-line';
+                        
+                        const startX = startRect.right + window.scrollX;
+                        const startY = startRect.top + startRect.height / 2 + window.scrollY;
+                        const endX = endRect.left + window.scrollX;
+                        const endY = endRect.top + endRect.height / 2 + window.scrollY;
+                        
+                        const length = Math.sqrt(Math.pow(endX - startX, 2) + Math.pow(endY - startY, 2));
+                        const angle = Math.atan2(endY - startY, endX - startX) * 180 / Math.PI;
+                        
+                        Object.assign(line.style, {
+                            width: `${length}px`,
+                            left: `${startX}px`,
+                            top: `${startY}px`,
+                            transform: `rotate(${angle}deg)`
+                        });
+                        
+                        document.body.appendChild(line);
+                    }
+                }
+            }
+
+            // Initial draw and redraw on window resize
+            drawLines();
+            window.addEventListener('resize', drawLines);
+
+            // Socket event handlers
+            socket.on('connect', () => {
+                log('Connected to server');
+            });
+
+            socket.on('pipeline_output', (data) => {
+                log(data);
+            });
+
+            socket.on('node_complete', (data) => {
+                const nodeId = data.node;
+                const nodeElement = document.getElementById(`node-${nodeId}`);
+                if (nodeElement) {
+                    // Reset all nodes
+                    document.querySelectorAll('.node').forEach(node => {
+                        node.classList.remove('running', 'completed', 'error');
+                        const status = node.querySelector('.node-status');
+                        if (status) status.textContent = 'Pending';
+                    });
+                    
+                    // Mark current node as completed
+                    nodeElement.classList.add('completed');
+                    const status = nodeElement.querySelector('.node-status');
+                    if (status) status.textContent = 'Completed';
+                    
+                    // Mark next node as running if exists
+                    const currentIndex = nodes.findIndex(n => n.id === nodeId);
+                    if (currentIndex < nodes.length - 1) {
+                        const nextNode = document.getElementById(`node-${nodes[currentIndex + 1].id}`);
+                        if (nextNode) {
+                            nextNode.classList.add('running');
+                            const nextStatus = nextNode.querySelector('.node-status');
+                            if (nextStatus) nextStatus.textContent = 'Running...';
+                        }
+                    }
+                }
+            });
+
+            socket.on('pipeline_complete', () => {
+                log('Pipeline execution completed');
+                runButton.disabled = false;
+                runButton.textContent = 'Run Pipeline';
+                runButton.classList.remove('bg-gray-400');
+                runButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            });
+
+            socket.on('pipeline_error', (error) => {
+                log(`Error: ${error}`, 'text-red-500');
+                document.querySelectorAll('.node').forEach(node => {
+                    if (node.classList.contains('running')) {
+                        node.classList.remove('running');
+                        node.classList.add('error');
+                        const status = node.querySelector('.node-status');
+                        if (status) status.textContent = 'Failed';
+                    }
+                });
+                runButton.disabled = false;
+                runButton.textContent = 'Run Pipeline';
+                runButton.classList.remove('bg-gray-400');
+                runButton.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            });
+
+            // Run pipeline button click handler
+            runButton.addEventListener('click', () => {
+                // Reset UI
+                document.querySelectorAll('.node').forEach(node => {
+                    node.classList.remove('completed', 'running', 'error');
+                    const status = node.querySelector('.node-status');
+                    if (status) status.textContent = 'Pending';
+                });
+                
+                // Mark first node as running
+                const firstNode = document.getElementById('node-node1');
+                if (firstNode) {
+                    firstNode.classList.add('running');
+                    const status = firstNode.querySelector('.node-status');
+                    if (status) status.textContent = 'Running...';
+                }
+                
+                // Clear log
+                logOutput.innerHTML = '<div>Starting pipeline execution...</div>';
+                
+                // Disable run button during execution
+                runButton.disabled = true;
+                runButton.textContent = 'Running...';
+                runButton.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                runButton.classList.add('bg-gray-400');
+                
+                // Emit start event to server
+                socket.emit('start_pipeline');
+            });
+
+            // Helper function to add log messages
+            function log(message, className = '') {
+                const logEntry = document.createElement('div');
+                if (className) logEntry.className = className;
+                logEntry.textContent = message.trim();
+                logOutput.appendChild(logEntry);
+                logOutput.scrollTop = logOutput.scrollHeight;
+            }
+        });
+    </script>
+</body>
+</html>

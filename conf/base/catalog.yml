@@ -1,0 +1,8 @@
+msg1:
+  type: MemoryDataset
+msg2:
+  type: MemoryDataset
+msg3:
+  type: MemoryDataset
+final_msg:
+  type: MemoryDataset

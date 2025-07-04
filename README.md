@@ -1,1 +1,1 @@
-# kedro-viz-finished
+This is the README for the Kedro model.
