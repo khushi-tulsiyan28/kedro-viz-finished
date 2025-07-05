@@ -26,13 +26,8 @@ dag = DAG(
 
 def run_kedro_pipeline():
     try:
-        # Go up two levels from the DAGs directory to reach the project root
-        project_path = os.path.abspath(os.path.join(
-            os.path.dirname(os.path.abspath(__file__)),  # dags directory
-            '..'  # airflow directory
-        ))
+        project_path = "/Users/khushitulsiyan/Downloads/kedro_model/kedro-viz-finished"
         
-        # Verify the project path contains pyproject.toml
         if not os.path.exists(os.path.join(project_path, 'pyproject.toml')):
             raise FileNotFoundError(
                 f"Could not find pyproject.toml in {project_path}. "
