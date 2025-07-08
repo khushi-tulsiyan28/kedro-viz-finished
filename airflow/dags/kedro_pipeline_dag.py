@@ -72,4 +72,17 @@ task = PythonOperator(
     dag=dag,
 )
 
-task
+def generate_pipeline_json():
+    subprocess.run(
+        ["kedro", "viz", "--save-file", "pipeline.json"],
+        cwd="/Users/khushitulsiyan/Downloads/kedro_model/kedro-viz-finished",
+        check=True
+    )
+
+generate_json_task = PythonOperator(
+    task_id='generate_pipeline_json',
+    python_callable=generate_pipeline_json,
+    dag=dag,
+)
+
+task >> generate_json_task
