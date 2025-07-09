@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useRef, Children } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, CircularProgress, Box } from '@mui/material';
 import PipelineControls from './components/PipelineControls';
 import PipelineVisualization from './components/PipelineVisualization';
-import ArtifacsPanel from './components/ArtifactsPanel';
+import ArtifactsPanel from './components/ArtifactsPanel';
 import ExecutionLog from './components/ExecutionLog';
 import KedroViz from '@quantumblack/kedro-viz';
-import { createPortal } from 'react-dom';
 import '@quantumblack/kedro-viz/lib/styles/styles.min.css';
+import PipelineControlPanel from './components/PipelineControlPanel';
 
 const initialNodes = [
   { id: 'node1', name: 'Node 1', description: 'Data Loading', status: 'pending', statusLabel: 'Pending' },
@@ -14,19 +14,6 @@ const initialNodes = [
   { id: 'node3', name: 'Node 3', description: 'Feature Engineering', status: 'pending', statusLabel: 'Pending' },
   { id: 'node4', name: 'Node 4', description: 'Final Processing', status: 'pending', statusLabel: 'Pending' }
 ];
-
-function IFrame({ children }) {
-  const [ref,s , tRef] = useState();
-  const container = ref?.contentWindow?.document?.body;
-
-  return (
-    <iframe ref={setRef}>
-      {container && createPortal(children, container)}
-    </iframe>
-  )
-
-}
-
 
 function App() {
   const [experimentId, setExperimentId] = useState('');
@@ -109,73 +96,76 @@ function App() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <header>
-        <h1 style={{ fontSize: 32, fontWeight: 700, color: '#333', marginBottom: 8 }}>
-          Kedro Pipeline Visualizer
-        </h1>
-        <p style={{ color: '#666', marginBottom: 24 }}>
-          Real-time pipeline execution monitoring
-        </p>
-      </header>
-      <Box mb={4}>
-        {pipelineLoading ? (
-          <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
-            <CircularProgress />
-          </Box>
-        ) : pipelineData ? (
-          // <KedroViz data={pipelineData} />
-            <KedroViz
-              data={pipelineData}
-              options={{
-                display: {
-                  expandPipelinesBtn: true,
-                  exportBtn: true,
-                  globalNavigation: false,
-                  labelBtn: true,
-                  layerBtn: true,
-                  metadataPanel: true,
-                  miniMap: false,
-                  sidebar: false,
-                  zoomToolbar: true,
-                },
-                expandAllPipelines: false,
-                nodeType: {
-                  disabled: { parameters: true }
-                },
-                tag: {
-                  enabled: { companies: true }
-                },
-                behaviour: {
-                  reFocus: true,
-                },
-                theme: "dark"
-              }}
-            />
+    <div className="App">
+      <PipelineControlPanel />
+      <Container maxWidth="lg" sx={{ py: 4 }}>
+        <header>
+          <h1 style={{ fontSize: 32, fontWeight: 700, color: '#333', marginBottom: 8 }}>
+            Kedro Pipeline Visualizer
+          </h1>
+          <p style={{ color: '#666', marginBottom: 24 }}>
+            Real-time pipeline execution monitoring
+          </p>
+        </header>
+        <Box mb={4}>
+          {pipelineLoading ? (
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
+              <CircularProgress />
+            </Box>
+          ) : pipelineData ? (
+            // <KedroViz data={pipelineData} />
+              <KedroViz
+                data={pipelineData}
+                options={{
+                  display: {
+                    expandPipelinesBtn: true,
+                    exportBtn: true,
+                    globalNavigation: false,
+                    labelBtn: true,
+                    layerBtn: true,
+                    metadataPanel: true,
+                    miniMap: false,
+                    sidebar: false,
+                    zoomToolbar: true,
+                  },
+                  expandAllPipelines: false,
+                  nodeType: {
+                    disabled: { parameters: true }
+                  },
+                  tag: {
+                    enabled: { companies: true }
+                  },
+                  behaviour: {
+                    reFocus: true,
+                  },
+                  theme: "dark"
+                }}
+              />
 
 
-          // <div> {JSON.stringify(pipelineData)}</div>
-        ) : (
-          <Box color="error.main">Failed to load pipeline data.</Box>
-        )}
-      </Box>
-      <PipelineControls
-        experimentId={experimentId}
-        setExperimentId={setExperimentId}
-        onFetchArtifacts={handleFetchArtifacts}
-        onRunPipeline={handleRunPipeline}
-        isRunning={isRunning}
-      />
-      <PipelineVisualization nodes={nodes} />
-      <ArtifactsPanel
-        runId={runId}
-        experimentId={experimentId}
-        artifacts={artifacts}
-        loading={artifactsLoading}
-        error={artifactsError}
-      />
-      <ExecutionLog logLines={logLines} />
-    </Container>
+            // <div> {JSON.stringify(pipelineData)}</div>
+          ) : (
+            <Box color="error.main">Failed to load pipeline data.</Box>
+          )}
+        </Box>
+        <PipelineControls
+          experimentId={experimentId}
+          setExperimentId={setExperimentId}
+          onFetchArtifacts={handleFetchArtifacts}
+          onRunPipeline={handleRunPipeline}
+          isRunning={isRunning}
+        />
+        <PipelineVisualization nodes={nodes} />
+        <ArtifactsPanel
+          runId={runId}
+          experimentId={experimentId}
+          artifacts={artifacts}
+          loading={artifactsLoading}
+          error={artifactsError}
+        />
+        <ExecutionLog logLines={logLines} />
+      </Container>
+    </div>
   );
 }
 

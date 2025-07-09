@@ -4,3 +4,4 @@ src/my_project/__pycache__
 src/my_project.egg-info
 .viz
 .venv
+node_modules
