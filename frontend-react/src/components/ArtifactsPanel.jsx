@@ -25,14 +25,26 @@ export default function ArtifactsPanel({ runId, experimentId, artifacts, loading
         <List dense>
           {artifacts.map(file => (
             <ListItem key={file.path}>
-              <Link
-                href={`http://localhost:5000/api/2.0/mlflow/artifacts/download?run_id=${runId}&path=${encodeURIComponent(file.path)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                underline="hover"
-              >
-                {file.path}
-              </Link>
+              {file.is_dir ? (
+                <Link
+                  href={`http://localhost:5000/#/experiments/${experimentId}/runs/${runId}/artifacts/${encodeURIComponent(file.path)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  underline="hover"
+                  color="primary"
+                >
+                  📁 {file.path}
+                </Link>
+              ) : (
+                <Link
+                  href={`http://localhost:5000/api/2.0/mlflow/artifacts/download?run_id=${runId}&path=${encodeURIComponent(file.path)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  underline="hover"
+                >
+                  {file.path}
+                </Link>
+              )}
             </ListItem>
           ))}
         </List>
