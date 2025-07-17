@@ -95,6 +95,26 @@ function App() {
     setArtifactsLoading(false);
   };
 
+  const handleFetchArtifactsByRunId = async () => {
+    setArtifacts([]);
+    setArtifactsError('');
+    setArtifactsLoading(true);
+    try {
+      const res = await fetch(`/api/mlflow/artifacts/by-run-id?run_id=${runId}`);
+      if (!res.ok) {
+        const err = await res.json();
+        setArtifactsError(err.error || 'Failed to fetch artifacts.');
+        setArtifactsLoading(false);
+        return;
+      }
+      const data = await res.json();
+      setArtifacts(data.artifacts);
+    } catch (err) {
+      setArtifactsError(err.message);
+    }
+    setArtifactsLoading(false);
+  };
+
   return (
     <div className="App">
       <PipelineControlPanel />
@@ -107,6 +127,34 @@ function App() {
             Real-time pipeline execution monitoring
           </p>
         </header>
+        <Box mb={2}>
+          <label htmlFor="experiment-id-input">Experiment ID: </label>
+          <input
+            id="experiment-id-input"
+            type="text"
+            value={experimentId}
+            onChange={e => setExperimentId(e.target.value)}
+            placeholder="Enter Experiment ID"
+            style={{ marginRight: 8 }}
+          />
+          <button onClick={handleFetchArtifacts} disabled={!experimentId || artifactsLoading}>
+            Fetch Artifacts by Experiment ID
+          </button>
+        </Box>
+        <Box mb={4}>
+          <label htmlFor="run-id-input">Run ID: </label>
+          <input
+            id="run-id-input"
+            type="text"
+            value={runId}
+            onChange={e => setRunId(e.target.value)}
+            placeholder="Enter Run ID"
+            style={{ marginRight: 8 }}
+          />
+          <button onClick={handleFetchArtifactsByRunId} disabled={!runId || artifactsLoading}>
+            Fetch Artifacts by Run ID
+          </button>
+        </Box>
         <Box mb={4}>
           {pipelineLoading ? (
             <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>

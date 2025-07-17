@@ -3,7 +3,6 @@ import { Button, TextField, Box, Typography, Alert } from '@mui/material';
 
 const PipelineControlPanel = () => {
   const [repo, setRepo] = useState('');
-  const [hash, setHash] = useState('');
   const [pipelineName, setPipelineName] = useState('');
   const [experimentId, setExperimentId] = useState('');
   const [token, setToken] = useState('');
@@ -19,7 +18,7 @@ const PipelineControlPanel = () => {
       const res = await fetch('/api/pull-repo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, hash, pipelineName, experimentId, token })
+        body: JSON.stringify({ repo, pipelineName, experimentId, token })
       });
       const data = await res.json();
       if (res.ok) {
@@ -41,7 +40,7 @@ const PipelineControlPanel = () => {
       const res = await fetch('/api/run-pipeline', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ repo, hash, pipelineName, experimentId })
+        body: JSON.stringify({ repo, pipelineName, experimentId })
       });
       const data = await res.json();
       if (res.ok) {
@@ -60,7 +59,6 @@ const PipelineControlPanel = () => {
       <Typography variant="h6" gutterBottom>Pipeline Control Panel</Typography>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         <TextField label="Git Repo URL" value={repo} onChange={e => setRepo(e.target.value)} fullWidth />
-        <TextField label="Commit Hash" value={hash} onChange={e => setHash(e.target.value)} fullWidth />
         <TextField label="Pipeline Name" value={pipelineName} onChange={e => setPipelineName(e.target.value)} fullWidth />
         <TextField label="Experiment ID" value={experimentId} onChange={e => setExperimentId(e.target.value)} fullWidth />
         <TextField label="Token (SSH/PAT)" value={token} onChange={e => setToken(e.target.value)} fullWidth type="password" />
