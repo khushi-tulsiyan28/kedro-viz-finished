@@ -22,12 +22,12 @@ app.get('/api/pipeline-data', (req, res) => {
 });
 
 app.post('/api/run-pipeline', express.json(), (req, res) => {
-  const { repo, hash, pipelineName, experimentId } = req.body;
-  if (!repo || !hash || !pipelineName || !experimentId) {
+  const { repo, pipelineName, experimentId } = req.body;
+  if (!repo || !pipelineName || !experimentId) {
     return res.status(400).json({ error: 'Missing required parameters' });
   }
   lastStatus = 'running';
-  lastLog = `Starting Airflow DAG for pipeline: ${pipelineName} (repo: ${repo}, hash: ${hash}, experimentId: ${experimentId})...`;
+  lastLog = `Starting Airflow DAG for pipeline: ${pipelineName} (repo: ${repo}, experimentId: ${experimentId})...`;
   exec(`airflow dags trigger kedro_pipeline`, (error, stdout, stderr) => {
     if (error) {
       lastStatus = 'error';
