@@ -26,6 +26,7 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [pipelineData, setPipelineData] = useState(null);
   const [pipelineLoading, setPipelineLoading] = useState(false);
+  const [mlflowLogContent, setMlflowLogContent] = useState('');
 
   useEffect(() => {
     // Fetch pipeline JSON for KedroViz
@@ -55,6 +56,36 @@ function App() {
     }, 3000);
     return () => clearInterval(interval);
   }, []);
+
+  // Automatically fetch and display the latest pipeline_execution.log artifact
+  useEffect(() => {
+    async function fetchLatestMlflowLog() {
+      // Always use the correct experiment name
+      const experiment = 'kedro-pipeline';
+      try {
+        const res = await fetch(`/api/mlflow/artifacts?experiment_id=${experiment}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.run_id) return;
+        const logFile = (data.artifacts || []).find(f => f.path === 'logs/pipeline_execution.log');
+        if (logFile) {
+          const logRes = await fetch(`/api/mlflow/artifact-content?run_id=${data.run_id}&path=${encodeURIComponent(logFile.path)}`);
+          if (!logRes.ok) return;
+          const logData = await logRes.json();
+          try {
+            setMlflowLogContent(atob(logData.base64));
+          } catch {
+            setMlflowLogContent(logData.base64);
+          }
+        } else {
+          setMlflowLogContent('');
+        }
+      } catch {
+        setMlflowLogContent('');
+      }
+    }
+    fetchLatestMlflowLog();
+  }, [isRunning]);
 
   const handleRunPipeline = async () => {
     // Reset UI
@@ -211,7 +242,7 @@ function App() {
           loading={artifactsLoading}
           error={artifactsError}
         />
-        <ExecutionLog logLines={logLines} />
+        <ExecutionLog logLines={mlflowLogContent ? mlflowLogContent.split('\n') : logLines} />
       </Container>
     </div>
   );
