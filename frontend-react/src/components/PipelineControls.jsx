@@ -26,14 +26,7 @@ export default function PipelineControls({
       >
         Fetch Artifacts
       </Button>
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={onRunPipeline}
-        disabled={isRunning}
-      >
-        {isRunning ? 'Running...' : 'Run Pipeline'}
-      </Button>
+      
     </Stack>
   );
 } 
