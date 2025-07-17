@@ -58,7 +58,7 @@ app.post('/api/pull-repo', express.json(), async (req, res) => {
       // Repo exists, do a pull
       await git.cwd(repoPath);
       await git.fetch();
-      await git.checkout('main');
+      await git.checkout('origin','main');
       await git.pull('origin' ,'main');
       res.json({ message: 'Repo pulled and checked out to hash', repo: repoName });
     } else {
