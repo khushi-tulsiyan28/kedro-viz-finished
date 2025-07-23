@@ -11,9 +11,8 @@ const { Buffer } = require('buffer');
 let lastLog = '';
 let lastStatus = 'idle';
 
-// Serve pipeline JSON for Kedro-Viz
 app.get('/api/pipeline-data', (req, res) => {
-  const pipelinePath = path.join(__dirname, '../pipeline.json/api/pipelines/__default__');
+  const pipelinePath = path.join(__dirname, '../pipeline.json');
   res.sendFile(pipelinePath, err => {
     if (err) {
       res.status(404).json({ error: 'pipeline.json not found' });
@@ -36,7 +35,40 @@ app.post('/api/run-pipeline', express.json(), (req, res) => {
     }
     lastStatus = 'triggered';
     lastLog += '\nAirflow DAG triggered\n' + stdout;
-    res.json({ message: 'Airflow DAG triggered', output: stdout });
+    console.log('Airflow trigger output:', stdout);
+    let joined = stdout.replace(/\n|\r/g, ' ');
+    const lines = stdout.split('\n');
+    let runIdCol = -1;
+    let run_id = null;
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.includes('dag_run_id')) {
+        const headers = line.split('|').map(h => h.trim());
+        runIdCol = headers.indexOf('dag_run_id');
+        continue;
+      }
+      if (runIdCol !== -1 && line.includes('manual__')) {
+        const cols = line.split('|').map(c => c.trim());
+        const firstPart = cols[runIdCol];
+        if (i + 1 < lines.length) {
+          const nextCols = lines[i + 1].split('|').map(c => c.trim());
+          if (nextCols[runIdCol] && nextCols[runIdCol].length > 0) {
+            run_id = firstPart + nextCols[runIdCol];
+          } else {
+            run_id = firstPart;
+          }
+        } else {
+          run_id = firstPart;
+        }
+        break;
+      }
+    }
+    console.log('Extracted run_id:', run_id);
+    if (!run_id) {
+      console.error('Could not parse Airflow run_id from output:', stdout);
+      return res.status(500).json({ error: 'Could not parse Airflow run_id from output', output: stdout });
+    }
+    res.json({ message: 'Airflow DAG triggered', output: stdout, run_id });
   });
 });
 
@@ -55,21 +87,18 @@ app.post('/api/pull-repo', express.json(), async (req, res) => {
 
   try {
     if (fs.existsSync(repoPath)) {
-      // Repo exists, do a pull
       await git.cwd(repoPath);
       await git.fetch();
       await git.checkout('origin','main');
       await git.pull('origin' ,'main');
       res.json({ message: 'Repo pulled and checked out to hash', repo: repoName });
     } else {
-      // Repo does not exist, clone it
-      // Insert token into repo URL for authentication
+      
       let authRepo = repo;
       if (repo.startsWith('https://')) {
         authRepo = repo.replace('https://', `https://${token}@`);
       } else if (repo.startsWith('git@')) {
-        // For SSH, you would need to set up SSH keys in the environment
-        // This is a placeholder for SSH-based auth
+        
         return res.status(400).json({ error: 'SSH-based cloning not implemented in this endpoint' });
       }
       await git.clone(authRepo, repoPath);
@@ -82,14 +111,12 @@ app.post('/api/pull-repo', express.json(), async (req, res) => {
   }
 });
 
-// Endpoint to fetch MLflow artifacts for the latest run in an experiment
 app.get('/api/mlflow/artifacts', async (req, res) => {
   const experimentId = req.query.experiment_id;
   if (!experimentId) {
     return res.status(400).json({ error: 'Missing experiment_id' });
   }
   try {
-    // 1. Get latest run for the experiment
     const searchRunsResp = await axios.post('http://localhost:5000/api/2.0/mlflow/runs/search', {
       experiment_ids: [experimentId],
       order_by: ["attributes.start_time DESC"],
@@ -100,7 +127,6 @@ app.get('/api/mlflow/artifacts', async (req, res) => {
       return res.status(404).json({ error: 'No runs found for this experiment' });
     }
     const runId = runs[0].info.run_id;
-    // 2. List artifacts for the latest run
     const listArtifactsResp = await axios.get(`http://localhost:5000/api/2.0/mlflow/artifacts/list?run_id=${runId}`);
     const artifacts = (listArtifactsResp.data.files || []).map(f => ({ path: f.path, is_dir: f.is_dir }));
     res.json({ run_id: runId, artifacts });
@@ -109,14 +135,12 @@ app.get('/api/mlflow/artifacts', async (req, res) => {
   }
 });
 
-// Endpoint to fetch MLflow artifacts for a specific run ID
 app.get('/api/mlflow/artifacts/by-run-id', async (req, res) => {
   const runId = req.query.run_id;
   if (!runId) {
     return res.status(400).json({ error: 'Missing run_id' });
   }
   try {
-    // List artifacts for the given run ID
     const listArtifactsResp = await axios.get(`http://localhost:5000/api/2.0/mlflow/artifacts/list?run_id=${runId}`);
     const artifacts = (listArtifactsResp.data.files || []).map(f => ({ path: f.path, is_dir: f.is_dir }));
     res.json({ run_id: runId, artifacts });
@@ -125,7 +149,6 @@ app.get('/api/mlflow/artifacts/by-run-id', async (req, res) => {
   }
 });
 
-// Endpoint to fetch the actual content of an MLflow artifact by run ID and path
 app.get('/api/mlflow/artifact-content', async (req, res) => {
   const runId = req.query.run_id;
   const artifactPath = req.query.path;
@@ -143,17 +166,14 @@ app.get('/api/mlflow/artifact-content', async (req, res) => {
     py.stderr.on('data', (data) => { error += data.toString(); });
     py.on('close', (code) => {
       if (code !== 0 || error) {
-        // If error contains HTML, strip it and return a generic error
         if (error.trim().startsWith('<!DOCTYPE') || error.trim().startsWith('<html')) {
           return res.status(500).json({ error: 'MLflow server returned an HTML error page. Check MLflow server and artifact path.' });
         }
         return res.status(500).json({ error: 'Failed to fetch artifact content', details: error || 'Unknown error' });
       }
-      // If output looks like HTML, return error
       if (output.trim().startsWith('<!DOCTYPE') || output.trim().startsWith('<html')) {
         return res.status(500).json({ error: 'MLflow server returned an HTML error page. Check MLflow server and artifact path.' });
       }
-      // Otherwise, return base64 content
       res.json({ base64: output });
     });
   } catch (err) {
@@ -161,12 +181,33 @@ app.get('/api/mlflow/artifact-content', async (req, res) => {
   }
 });
 
-// Get latest pipeline log
+app.get('/api/airflow-log', (req, res) => {
+  const { dag_id, run_id, task_id, attempt } = req.query;
+  if (!dag_id || !run_id || !task_id) {
+    return res.status(400).json({ error: 'Missing required parameters' });
+  }
+  const attemptNum = attempt || 1;
+  const logPath = path.join(
+    process.env.HOME,
+    'airflow',
+    'logs',
+    `dag_id=${dag_id}`,
+    `run_id=${run_id}`,
+    `task_id=${task_id}`,
+    `attempt=${attemptNum}.log`
+  );
+  fs.readFile(logPath, 'utf8', (err, data) => {
+    if (err) {
+      return res.status(404).json({ error: 'Log file not found', details: err.message });
+    }
+    res.json({ log: data });
+  });
+});
+
 app.get('/api/pipeline-log', (req, res) => {
   res.json({ log: lastLog });
 });
 
-// Get current pipeline status
 app.get('/api/pipeline-status', (req, res) => {
   res.json({ status: lastStatus });
 });
