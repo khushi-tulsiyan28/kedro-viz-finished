@@ -1,5 +1,5 @@
   import React, { useState, useEffect } from 'react';
-  import { Container, CircularProgress, Box } from '@mui/material';
+  import { Container, CircularProgress, Box, Paper, Typography, CssBaseline, AppBar, Toolbar } from '@mui/material';
   import PipelineControls from './components/PipelineControls';
   import PipelineVisualization from './components/PipelineVisualization';
   import ArtifactsPanel from './components/ArtifactsPanel';
@@ -147,117 +147,98 @@
     };
 
     return (
-      <div className="App">
-        <PipelineControlPanel
-          repo={repo}
-          setRepo={setRepo}
-          pipelineName={pipelineName}
-          setPipelineName={setPipelineName}
-          experimentId={experimentId}
-          setExperimentId={setExperimentId}
-          token={token}
-          setToken={setToken}
-          onRunPipeline={handleRunPipeline}
-        />
-        <Container maxWidth="lg" sx={{ py: 4 }}>
-          <header>
-            <h1 style={{ fontSize: 32, fontWeight: 700, color: '#333', marginBottom: 8 }}>
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', fontFamily: 'Roboto, Arial, sans-serif' }}>
+        <CssBaseline />
+        <AppBar position="sticky" color="primary" elevation={2}>
+          <Toolbar>
+            <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: 1 }}>
               Kedro Pipeline Visualizer
-            </h1>
-            <p style={{ color: '#666', marginBottom: 24 }}>
-              Real-time pipeline execution monitoring
-            </p>
-          </header>
-          <Box mb={2}>
-            <label htmlFor="experiment-id-input">Experiment ID: </label>
-            <input
-              id="experiment-id-input"
-              type="text"
-              value={experimentId}
-              onChange={e => setExperimentId(e.target.value)}
-              placeholder="Enter Experiment ID"
-              style={{ marginRight: 8 }}
+            </Typography>
+          </Toolbar>
+        </AppBar>
+        <Container maxWidth="md" sx={{ py: 4 }}>
+          <Paper elevation={3} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+            <PipelineControlPanel
+              repo={repo}
+              setRepo={setRepo}
+              pipelineName={pipelineName}
+              setPipelineName={setPipelineName}
+              experimentId={experimentId}
+              setExperimentId={setExperimentId}
+              token={token}
+              setToken={setToken}
+              onRunPipeline={handleRunPipeline}
             />
-            <button onClick={handleFetchArtifacts} disabled={!experimentId || artifactsLoading}>
-              Fetch Artifacts by Experiment ID
-            </button>
-          </Box>
-          <Box mb={4}>
-            <label htmlFor="run-id-input">Run ID: </label>
-            <input
-              id="run-id-input"
-              type="text"
-              value={mlflowRunId}
-              onChange={e => setMlflowRunId(e.target.value)}
-              placeholder="Enter Run ID"
-              style={{ marginRight: 8 }}
+          </Paper>
+          <Paper elevation={1} sx={{ p: 3, mb: 4, borderRadius: 3 }}>
+            <Box mb={3}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                Pipeline Visualization
+              </Typography>
+              {pipelineLoading ? (
+                <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
+                  <CircularProgress />
+                </Box>
+              ) : pipelineData ? (
+                <KedroViz
+                    data={pipelineData}
+                    options={{
+                      display: {
+                        expandPipelinesBtn: true,
+                        exportBtn: true,
+                        globalNavigation: false,
+                        labelBtn: true,
+                        layerBtn: true,
+                        metadataPanel: true,
+                        miniMap: false,
+                        sidebar: false,
+                        zoomToolbar: true,
+                      },
+                      expandAllPipelines: false,
+                      nodeType: {
+                        disabled: { parameters: true }
+                      },
+                      tag: {
+                        enabled: { companies: true }
+                      },
+                      behaviour: {
+                        reFocus: true,
+                      },
+                      theme: "dark"
+                    }}
+                />
+
+
+            ) : (
+                <Box color="error.main">Failed to load pipeline data.</Box>
+              )}
+            </Box>
+            <ArtifactsPanel
+              runId={mlflowRunId}
+              experimentId={experimentId}
+              artifacts={artifacts}
+              loading={artifactsLoading}
+              error={artifactsError}
             />
-            <button onClick={handleFetchArtifactsByRunId} disabled={!mlflowRunId || artifactsLoading}>
-              Fetch Artifacts by Run ID
-            </button>
-          </Box>
-          <Box mb={4}>
-            {pipelineLoading ? (
-              <Box display="flex" justifyContent="center" alignItems="center" minHeight={200}>
-                <CircularProgress />
-              </Box>
-            ) : pipelineData ? (
-              <KedroViz
-                  data={pipelineData}
-                  options={{
-                    display: {
-                      expandPipelinesBtn: true,
-                      exportBtn: true,
-                      globalNavigation: false,
-                      labelBtn: true,
-                      layerBtn: true,
-                      metadataPanel: true,
-                      miniMap: false,
-                      sidebar: false,
-                      zoomToolbar: true,
-                    },
-                    expandAllPipelines: false,
-                    nodeType: {
-                      disabled: { parameters: true }
-                    },
-                    tag: {
-                      enabled: { companies: true }
-                    },
-                    behaviour: {
-                      reFocus: true,
-                    },
-                    theme: "dark"
-                  }}
+            <Box mt={4}>
+              <Typography variant="h6" sx={{ fontWeight: 600, mb: 1 }}>
+                Execution Log
+              </Typography>
+              <ExecutionLog
+                dagId="kedro_pipeline"
+                runId={airflowRunId}
+                taskId="run_kedro_pipeline"
+                attempt={1}
               />
-
-
-          ) : (
-              <Box color="error.main">Failed to load pipeline data.</Box>
-            )}
-          </Box>
-          <PipelineControls
-            experimentId={experimentId}
-            setExperimentId={setExperimentId}
-            onFetchArtifacts={handleFetchArtifacts}
-            onRunPipeline={handleRunPipeline}
-            isRunning={isRunning}
-          />
-          <PipelineVisualization nodes={nodes} />
-          <ArtifactsPanel
-            runId={mlflowRunId}
-            experimentId={experimentId}
-            artifacts={artifacts}
-            loading={artifactsLoading}
-            error={artifactsError}
-          />
-          <ExecutionLog
-            dagId="kedro_pipeline"
-            runId={airflowRunId}
-            taskId="run_kedro_pipeline"
-            attempt={1}
-          />
+            </Box>
+          </Paper>
         </Container>
-      </div>
+        <Box component="footer" sx={{ py: 2, textAlign: 'center', bgcolor: 'background.paper', borderTop: 1, borderColor: 'divider' }}>
+          <Typography variant="body2" color="text.secondary">
+            Kedro Pipeline Visualizer &copy; {new Date().getFullYear()} &mdash; v1.0.0
+          </Typography>
+        </Box>
+      </Box>
     );
   }
 
