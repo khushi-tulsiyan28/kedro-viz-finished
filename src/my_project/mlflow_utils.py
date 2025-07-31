@@ -5,7 +5,9 @@ from typing import Optional, Dict, Any
 from contextlib import contextmanager
 
 def setup_mlflow():
-    mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "file://" + str(Path.cwd() / "mlruns"))
+    # Use user's home directory for MLflow tracking if not specified
+    default_tracking_uri = f"file://{os.path.expanduser('~/mlruns')}"
+    mlflow_tracking_uri = os.getenv("MLFLOW_TRACKING_URI", default_tracking_uri)
     mlflow.set_tracking_uri(mlflow_tracking_uri)
     experiment_name = os.getenv("MLFLOW_EXPERIMENT_NAME", "kedro-pipeline")
     mlflow.set_experiment(experiment_name)
