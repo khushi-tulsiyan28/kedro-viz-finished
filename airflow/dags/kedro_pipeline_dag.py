@@ -76,85 +76,84 @@ def setup_and_pull_repository(**context):
     branch = dag_run.conf.get('branch', 'main')
     project_name = dag_run.conf.get('project_name', 'kedro_project')
     
-    try:
-        ssh_key_id = dag_run.conf.get('ssh_key_id')
-        logging.info(f"SSH Key ID from configuration: {ssh_key_id}")
-        ssh_key_data = {'privateKey': '', 'publicKey': ''}
-        
-        if ssh_key_id:
-            try:
-                api_url = os.getenv('BACKEND_API_URL', 'http://localhost:3001')
-                ssh_key_response = requests.get(
-                    f"{api_url}/api/ssh-keys/{ssh_key_id}",
-                    timeout=10
-                )
-                
-                if ssh_key_response.status_code == 200:
-                    ssh_key_info = ssh_key_response.json()
-                    ssh_key_data = {
-                        'privateKey': ssh_key_info.get('data', {}).get('privateKey', ''),
-                        'publicKey': ssh_key_info.get('data', {}).get('publicKey', '')
-                    }
-                    logging.info(f"Successfully retrieved SSH key from database: {ssh_key_id}")
-                else:
-                    logging.warning(f"Failed to retrieve SSH key {ssh_key_id} from database: {ssh_key_response.status_code}")
-                    
-            except Exception as e:
-                logging.error(f"Error fetching SSH key from database: {e}")
-        
-        if not ssh_key_data['privateKey']:
-            ssh_key_data = {
-                'privateKey': os.getenv('SSH_PRIVATE_KEY', ''),
-                'publicKey': os.getenv('SSH_PUBLIC_KEY', '')
-            }
-        
-        if not ssh_key_data['privateKey']:
-            logging.warning("SSH private key not found, using local project instead")
-            project_path = "/Users/khushitulsiyan/Downloads/kedro_model/kedro-viz-finished/kedro-viz-finished/kedro-viz-finished/kedro-viz-finished"
-            
-            if not os.path.exists(project_path):
-                raise Exception(f"Local project path does not exist: {project_path}")
-            
-            if not os.path.exists(os.path.join(project_path, 'pyproject.toml')):
-                raise Exception(f"Local project does not contain pyproject.toml: {project_path}")
-            
-            logging.info("Performing local project validation...")
-            
-            is_git_repo = os.path.exists(os.path.join(project_path, '.git'))
-            if is_git_repo:
-                logging.info("Local project is a git repository")
-            else:
-                logging.info("Local project is not a git repository (this is acceptable)")
-            
-            logging.info("Local project validation successful!")
-            
-            validation_info = {
-                'repo_url': 'local',
-                'branch': 'local',
-                'commit_hash': 'local',
-                'commit_message': 'local project',
-                'clone_successful': True,
-                'validation_passed': True,
-                'is_git_repo': is_git_repo
-            }
-            
-            logging.info(f"Using local project: {project_path}")
-            context['task_instance'].xcom_push(key='project_path', value=project_path)
-            context['task_instance'].xcom_push(key='repo_status', value='local_project')
-            context['task_instance'].xcom_push(key='validation_info', value=validation_info)
-            
-            send_repository_success_notification(
-                guid=context['dag_run'].run_id,
-                pipeline_name=dag_run.conf.get('pipeline_name', 'default-pipeline'),
-                repo_url='local',
-                branch='local',
-                project_path=project_path,
-                repo_status='local_project',
-                validation_info=validation_info
+    ssh_key_id = dag_run.conf.get('ssh_key_id')
+    logging.info(f"SSH Key ID from configuration: {ssh_key_id}")
+    ssh_key_data = {'privateKey': '', 'publicKey': ''}
+    
+    if ssh_key_id:
+        try:
+            api_url = os.getenv('BACKEND_API_URL', 'http://localhost:3001')
+            ssh_key_response = requests.get(
+                f"{api_url}/api/ssh-keys/{ssh_key_id}",
+                timeout=10
             )
             
-            return project_path
+            if ssh_key_response.status_code == 200:
+                ssh_key_info = ssh_key_response.json()
+                ssh_key_data = {
+                    'privateKey': ssh_key_info.get('data', {}).get('privateKey', ''),
+                    'publicKey': ssh_key_info.get('data', {}).get('publicKey', '')
+                }
+                logging.info(f"Successfully retrieved SSH key from database: {ssh_key_id}")
+            else:
+                logging.warning(f"Failed to retrieve SSH key {ssh_key_id} from database: {ssh_key_response.status_code}")
+                
+        except Exception as e:
+            logging.error(f"Error fetching SSH key from database: {e}")
+    
+    if not ssh_key_data['privateKey']:
+        ssh_key_data = {
+            'privateKey': os.getenv('SSH_PRIVATE_KEY', ''),
+            'publicKey': os.getenv('SSH_PUBLIC_KEY', '')
+        }
+    
+    if not ssh_key_data['privateKey']:
+        logging.warning("SSH private key not found, using local project instead")
+        project_path = "/Users/khushitulsiyan/Downloads/kedro_model/kedro-viz-finished/kedro-viz-finished/kedro-viz-finished/kedro-viz-finished"
         
+        if not os.path.exists(project_path):
+            raise Exception(f"Local project path does not exist: {project_path}")
+        
+        if not os.path.exists(os.path.join(project_path, 'pyproject.toml')):
+            raise Exception(f"Local project does not contain pyproject.toml: {project_path}")
+        
+        logging.info("Performing local project validation...")
+        
+        is_git_repo = os.path.exists(os.path.join(project_path, '.git'))
+        if is_git_repo:
+            logging.info("Local project is a git repository")
+        else:
+            logging.info("Local project is not a git repository (this is acceptable)")
+        
+        logging.info("Local project validation successful!")
+        
+        validation_info = {
+            'repo_url': 'local',
+            'branch': 'local',
+            'commit_hash': 'local',
+            'commit_message': 'local project',
+            'clone_successful': True,
+            'validation_passed': True,
+            'is_git_repo': is_git_repo
+        }
+        
+        logging.info(f"Using local project: {project_path}")
+        context['task_instance'].xcom_push(key='project_path', value=project_path)
+        context['task_instance'].xcom_push(key='repo_status', value='local_project')
+        context['task_instance'].xcom_push(key='validation_info', value=validation_info)
+        
+        send_repository_success_notification(
+            guid=context['dag_run'].run_id,
+            pipeline_name=dag_run.conf.get('pipeline_name', 'default-pipeline'),
+            repo_url='local',
+            branch='local',
+            project_path=project_path,
+            repo_status='local_project',
+            validation_info=validation_info
+        )
+        
+        return project_path
+    
     try:
         ssh_dir = Path.home() / ".ssh"
         ssh_dir.mkdir(mode=0o700, exist_ok=True)
@@ -280,51 +279,6 @@ def setup_and_pull_repository(**context):
         )
         
         return project_path
-        
-    except subprocess.CalledProcessError as e:
-        error_msg = f"Git operation failed: {e.stderr}"
-        logging.error(error_msg)
-        
-        failure_info = {
-            'repo_url': repo_url,
-            'branch': branch,
-            'error': error_msg,
-            'clone_successful': False
-        }
-        context['task_instance'].xcom_push(key='repo_status', value='clone_failed')
-        context['task_instance'].xcom_push(key='validation_info', value=failure_info)
-        
-        raise Exception(error_msg)
-        
-    except subprocess.TimeoutExpired as e:
-        error_msg = f"Git operation timed out: {e}"
-        logging.error(error_msg)
-        
-        failure_info = {
-            'repo_url': repo_url,
-            'branch': branch,
-            'error': error_msg,
-            'clone_successful': False
-        }
-        context['task_instance'].xcom_push(key='repo_status', value='clone_timeout')
-        context['task_instance'].xcom_push(key='validation_info', value=failure_info)
-        
-        raise Exception(error_msg)
-        
-    except Exception as e:
-        error_msg = f"Repository setup and pull failed: {e}"
-        logging.error(error_msg)
-        
-        failure_info = {
-            'repo_url': repo_url,
-            'branch': branch,
-            'error': str(e),
-            'clone_successful': False
-        }
-        context['task_instance'].xcom_push(key='repo_status', value='setup_failed')
-        context['task_instance'].xcom_push(key='validation_info', value=failure_info)
-        
-        raise
 
 def create_mlflow_experiment(experiment_name, pipeline_name, guid):
     try:
