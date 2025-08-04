@@ -65,8 +65,7 @@ dag = DAG(
 
 def setup_and_pull_repository(**context):
     """
-    Combined function to setup SSH keys and pull repository.
-    Returns the project path for use in subsequent tasks.
+    Setup SSH keys and pull repository from Git
     """
     dag_run = context['dag_run']
     
@@ -76,39 +75,14 @@ def setup_and_pull_repository(**context):
     branch = dag_run.conf.get('branch', 'main')
     project_name = dag_run.conf.get('project_name', 'kedro_project')
     
-    ssh_key_id = dag_run.conf.get('ssh_key_id')
-    logging.info(f"SSH Key ID from configuration: {ssh_key_id}")
-    ssh_key_data = {'privateKey': '', 'publicKey': ''}
+    # Get SSH keys directly from DAG configuration
+    ssh_private_key = dag_run.conf.get('ssh_private_key', '')
+    ssh_public_key = dag_run.conf.get('ssh_public_key', '')
     
-    if ssh_key_id:
-        try:
-            api_url = os.getenv('BACKEND_API_URL', 'http://localhost:3001')
-            ssh_key_response = requests.get(
-                f"{api_url}/api/ssh-keys/{ssh_key_id}",
-                timeout=10
-            )
-            
-            if ssh_key_response.status_code == 200:
-                ssh_key_info = ssh_key_response.json()
-                ssh_key_data = {
-                    'privateKey': ssh_key_info.get('data', {}).get('privateKey', ''),
-                    'publicKey': ssh_key_info.get('data', {}).get('publicKey', '')
-                }
-                logging.info(f"Successfully retrieved SSH key from database: {ssh_key_id}")
-            else:
-                logging.warning(f"Failed to retrieve SSH key {ssh_key_id} from database: {ssh_key_response.status_code}")
-                
-        except Exception as e:
-            logging.error(f"Error fetching SSH key from database: {e}")
+    logging.info(f"SSH keys provided in configuration: Private key length: {len(ssh_private_key)}, Public key length: {len(ssh_public_key)}")
     
-    if not ssh_key_data['privateKey']:
-        ssh_key_data = {
-            'privateKey': os.getenv('SSH_PRIVATE_KEY', ''),
-            'publicKey': os.getenv('SSH_PUBLIC_KEY', '')
-        }
-    
-    if not ssh_key_data['privateKey']:
-        logging.warning("SSH private key not found, using local project instead")
+    if not ssh_private_key:
+        logging.warning("SSH private key not found in configuration, using local project instead")
         project_path = "/Users/khushitulsiyan/Downloads/kedro_model/kedro-viz-finished/kedro-viz-finished/kedro-viz-finished/kedro-viz-finished"
         
         if not os.path.exists(project_path):
@@ -160,32 +134,18 @@ def setup_and_pull_repository(**context):
         
         private_key_path = ssh_dir / "id_rsa"
         with open(private_key_path, "w") as f:
-            f.write(ssh_key_data['privateKey'])
+            f.write(ssh_private_key)
         os.chmod(private_key_path, 0o600)
         
         public_key_path = ssh_dir / "id_rsa.pub"
         with open(public_key_path, "w") as f:
-            f.write(ssh_key_data['publicKey'])
+            f.write(ssh_public_key)
         os.chmod(public_key_path, 0o644)
-        
-        ssh_config_path = ssh_dir / "config"
-        with open(ssh_config_path, "w") as f:
-            f.write(f"""Host github.com
-    HostName github.com
-    User git
-    IdentityFile ~/.ssh/id_rsa
-    IdentitiesOnly yes
-""")
-        os.chmod(ssh_config_path, 0o600)
         
         logging.info("SSH keys setup completed successfully")
         
-    except Exception as e:
-        logging.error(f"Failed to setup SSH key: {e}")
-        raise Exception("Failed to setup SSH key")
-    
-    if not repo_url:
-        raise Exception("Repository URL is required when SSH keys are provided")
+        if not repo_url:
+            raise Exception("Repository URL is required when SSH keys are provided")
         
         if not repo_url.startswith(('git@', 'https://', 'http://')):
             raise Exception(f"Invalid repository URL format: {repo_url}")
@@ -279,6 +239,10 @@ def setup_and_pull_repository(**context):
         )
         
         return project_path
+        
+    except Exception as e:
+        logging.error(f"Error in setup_and_pull_repository: {e}")
+        raise
 
 def create_mlflow_experiment(experiment_name, pipeline_name, guid):
     try:
@@ -362,11 +326,11 @@ def run_kedro_pipeline(**context):
             env["MLFLOW_RUN_ID"] = run.info.run_id
             
             result = subprocess.run(
-                cmd,
-                cwd=project_path,
-                check=True,
+                    cmd,
+                    cwd=project_path,
+                    check=True,
                 timeout=300,
-                capture_output=True,
+                    capture_output=True,
                 text=True,
                 env=env
             )
@@ -384,23 +348,23 @@ def run_kedro_pipeline(**context):
             mlflow.log_metric("pipeline_success", 1)
             
             log_file_path = os.path.join(project_path, f"pipeline_execution_{guid}.log")
-            with open(log_file_path, "w") as log_file:
-                log_file.write(f"Pipeline: {pipeline_name}\n")
-                log_file.write(f"GUID: {guid}\n")
-                log_file.write(f"Start Time: {datetime.now().isoformat()}\n")
-                log_file.write(f"Execution Time: {execution_time:.2f} seconds\n")
-                log_file.write("--- STDOUT ---\n")
-                log_file.write(result.stdout)
-                log_file.write("\n--- STDERR ---\n")
-                log_file.write(result.stderr)
+        with open(log_file_path, "w") as log_file:
+            log_file.write(f"Pipeline: {pipeline_name}\n")
+            log_file.write(f"GUID: {guid}\n")
+            log_file.write(f"Start Time: {datetime.now().isoformat()}\n")
+            log_file.write(f"Execution Time: {execution_time:.2f} seconds\n")
+            log_file.write("--- STDOUT ---\n")
+            log_file.write(result.stdout)
+            log_file.write("\n--- STDERR ---\n")
+            log_file.write(result.stderr)
             
             mlflow.log_artifact(log_file_path, artifact_path="logs")
             
-            pipeline_json_path = os.path.join(project_path, "pipeline.json")
-            if os.path.exists(pipeline_json_path):
-                mlflow.log_artifact(pipeline_json_path, artifact_path="pipeline")
+        pipeline_json_path = os.path.join(project_path, "pipeline.json")
+        if os.path.exists(pipeline_json_path):
+            mlflow.log_artifact(pipeline_json_path, artifact_path="pipeline")
             
-            logging.info(f"Pipeline execution completed successfully. GUID: {guid}")
+        logging.info(f"Pipeline execution completed successfully. GUID: {guid}")
             
     except subprocess.TimeoutExpired:
         error_msg = "Kedro pipeline timed out after 5 minutes"
@@ -453,22 +417,6 @@ def generate_pipeline_json(**context):
         logger.error(f"Failed to generate pipeline JSON: {e}")
         raise
 
-
-
-def cleanup_ssh_keys(**context):
-    """
-    Cleanup function to remove SSH keys after pipeline execution
-    """
-    try:
-        ssh_dir = Path.home() / ".ssh"
-        for key_file in ["id_rsa", "id_rsa.pub", "config"]:
-            key_path = ssh_dir / key_file
-            if key_path.exists():
-                key_path.unlink()
-                logging.info(f"Cleaned up SSH key: {key_file}")
-    except Exception as e:
-        logging.warning(f"Failed to cleanup SSH keys: {e}")
-
 setup_and_pull_repo_task = PythonOperator(
     task_id='setup_and_pull_repo',
     python_callable=setup_and_pull_repository,
@@ -482,7 +430,7 @@ run_pipeline_task = PythonOperator(
     provide_context=True,
     execution_timeout=timedelta(minutes=10),
     dag=dag,
-)
+    )
 
 generate_json_task = PythonOperator(
     task_id='generate_pipeline_json',
@@ -491,13 +439,6 @@ generate_json_task = PythonOperator(
     dag=dag,
 )
 
-cleanup_task = PythonOperator(
-    task_id='cleanup_ssh_keys',
-    python_callable=cleanup_ssh_keys,
-    provide_context=True,
-    dag=dag,
-)
-
-setup_and_pull_repo_task >> run_pipeline_task >> generate_json_task >> cleanup_task
+setup_and_pull_repo_task >> run_pipeline_task >> generate_json_task
 
 
